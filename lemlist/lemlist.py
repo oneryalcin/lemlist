@@ -105,6 +105,82 @@ class Campaigns:
 
         return json_list
 
+    def update_lead(self, campaign_id: str, email: str, lead: dict):
+        """
+        This endpoint updates a lead in a specific campaign.
+
+        If the lead doesn't exist a 404 error will be returned.
+        HTTP Request
+
+        PATCH https://api.lemlist.com/api/campaigns/:campaignId/leads/:email
+        URL Parameters
+        Parameter 	Description
+        campaignId 	The ID of the campaign to add the lead.
+        email 	email address of the lead
+        Body Parameters
+
+        Body is mandatory. It must be a JSON object with any information you want to update on the lead.
+
+        If no body is specified a 400 error will be returned.
+
+            curl -X PATCH https://api.lemlist.com/api/campaigns/cam_aa7uvyxECcni5KXBM/leads/richard@piedpiper.com \
+          -H "Content-Type: application/json" \
+          --data '{"companyName":"Pied Piper"}' \
+          --user ":YourApiKey"
+
+
+        The above command returns JSON structured like this:
+
+        {
+          "campaignId": "cam_aa7uvyxECcni5KXBM",
+          "campaignName": "Campaign1",
+          "leadUrl":"https://api.lemlist.com/api/leads/richard%40piedpiper.com",
+          "_id":"lea_aaNfSAHJoa4gj86Px",
+          "email":"richard@piedpiper.com",
+          "firstName":"Richard",
+          "lastName":"Hendricks",
+          "companyName": "Pied Piper"
+        }
+        """
+
+        # do the patch and check if return is 200 otherwise raise error
+        response = self.client.send_request(
+            method="PATCH",
+            endpoint=f"/campaigns/{campaign_id}/leads/{email}",
+            payload=lead
+        )
+
+        return response
+
+
+    def delete_lead(self, campaign_id: str, email: str):
+        """
+        This endpoint delete a lead from a specific campaign.
+        All information, including statistics, will be deleted.
+        HTTP Request
+
+        DELETE https://api.lemlist.com/api/campaigns/:campaignId/leads/:email?action=remove
+        URL Parameters
+        Parameter 	Description
+        campaignId 	The ID of the campaign to add the lead.
+        email 	email address of the lead
+        Query Parameters
+        Parameter 	Value 	Description
+        action 	remove 	Force the deletion of the lead
+
+        > curl -X DELETE https://api.lemlist.com/api/campaigns/cam_aa7uvyxECcni5KXBM/leads/richard@piedpiper.com?action=remove --user ":YourApiKey"
+        > {
+              "_id": "lea_aaNfSAHJoa4gj86Px",
+              "email": "richard@piedpiper.com"
+            }
+        """
+
+        return self.client.send_request(
+            method="DELETE",
+            endpoint=f"/campaigns/{campaign_id}/leads/{email}",
+            params={"action": "remove"}
+        )
+
     def delete_campaign(self, campaign_id):
         return self.client.send_request("DELETE", f"/campaigns/{campaign_id}")
 
