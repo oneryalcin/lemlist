@@ -52,11 +52,17 @@ class Client:
 
 class Campaigns:
 
-    def __init__(self, client: Client):
+    def __init__(self, client: Client, version_id: int = 2):
         self.client = client
+        self.version_id = version_id
 
-    def get_campaigns(self):
-        return self.client.send_request("GET", "/campaigns")
+    def get_campaigns(self, offset:int = 0, limit: int = 10, page: int = 1):
+        return self.client.send_request("GET", "/campaigns", {
+            "version": f"v{self.version_id}",
+            "offset": offset,
+            "limit": limit,
+            "page": page,
+        })
 
     def get_campaign(self, campaign_id=None, campaign_name=None):
 
@@ -64,10 +70,18 @@ class Campaigns:
             return self.client.send_request("GET", f"/campaigns/{campaign_id}")
 
         elif campaign_name:
-            campaigns = self.get_campaigns()
-            for campaign in campaigns:
-                if campaign["name"] == campaign_name:
-                    return campaign
+            offset = 0
+            page = 1
+            while True:
+                get_campaigns_resp = self.get_campaigns(offset=offset, page=page)
+                for campaign in get_campaigns_resp['campaigns']:
+                    offset += 1
+                    if campaign["name"] == campaign_name:
+                        return campaign
+                page+=1
+                pagination = get_campaigns_resp['campaigns']
+                if not 'nextPage' in pagination:
+                    break
 
         else:
             raise ValueError("Either campaign_id or campaign_name must be provided.")
