@@ -33,15 +33,17 @@ class Client:
         auth_val = base64.b64encode(f":{self.api_key}".encode()).decode()
 
         return {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + auth_val
+            "Content-Type": "application/json",
+            "Authorization": "Basic " + auth_val,
         }
 
     def send_request(self, method, endpoint, params=None, payload=None):
         url = self.base_url + endpoint
 
         payload = json.dumps(payload) if payload else None
-        response = requests.request(method, url, headers=self.headers, params=params, data=payload)
+        response = requests.request(
+            method, url, headers=self.headers, params=params, data=payload
+        )
         response.raise_for_status()
 
         try:
@@ -56,13 +58,17 @@ class Campaigns:
         self.client = client
         self.version_id = version_id
 
-    def get_campaigns(self, offset:int = 0, limit: int = 10, page: int = 1):
-        return self.client.send_request("GET", "/campaigns", {
-            "version": f"v{self.version_id}",
-            "offset": offset,
-            "limit": limit,
-            "page": page,
-        })
+    def get_campaigns(self, offset: int = 0, limit: int = 10, page: int = 1):
+        return self.client.send_request(
+            "GET",
+            "/campaigns",
+            {
+                "version": f"v{self.version_id}",
+                "offset": offset,
+                "limit": limit,
+                "page": page,
+            },
+        )
 
     def get_campaign(self, campaign_id=None, campaign_name=None):
 
@@ -74,13 +80,13 @@ class Campaigns:
             page = 1
             while True:
                 get_campaigns_resp = self.get_campaigns(offset=offset, page=page)
-                for campaign in get_campaigns_resp['campaigns']:
+                for campaign in get_campaigns_resp["campaigns"]:
                     offset += 1
                     if campaign["name"] == campaign_name:
                         return campaign
-                page+=1
-                pagination = get_campaigns_resp['campaigns']
-                if not 'nextPage' in pagination:
+                page += 1
+                pagination = get_campaigns_resp["campaigns"]
+                if not "nextPage" in pagination:
                     break
 
         else:
@@ -91,9 +97,11 @@ class Campaigns:
 
         GET https://api.lemlist.com/api/campaigns/:campaignId/export/leads?state=all
         """
-        leads = self.client.send_request("GET", f"/campaigns/{campaign_id}/export/leads?state=all")
+        leads = self.client.send_request(
+            "GET", f"/campaigns/{campaign_id}/export/leads?state=all"
+        )
 
-        lines = leads.strip().split('\r\n')
+        lines = leads.strip().split("\r\n")
 
         # Create a CSV reader to process the lines, assuming the first line contains headers
         reader = csv.reader(lines)
@@ -109,11 +117,13 @@ class Campaigns:
         for row in reader:
             row_dict = {headers[i]: row[i] for i in range(len(headers))}
 
-            vals_for_hash = [v for k, v in row_dict.items() if k not in ('hash', 'emailStatus')]
+            vals_for_hash = [
+                v for k, v in row_dict.items() if k not in ("hash", "emailStatus")
+            ]
             # create a hash field for each row, takes all values and creates a md5 hash
-            row_dict['hash'] = md5(json.dumps(vals_for_hash).encode()).hexdigest()
+            row_dict["hash"] = md5(json.dumps(vals_for_hash).encode()).hexdigest()
 
-            _ = row_dict.pop('emailStatus')
+            _ = row_dict.pop("emailStatus")
 
             json_list.append(row_dict)
 
@@ -161,11 +171,10 @@ class Campaigns:
         response = self.client.send_request(
             method="PATCH",
             endpoint=f"/campaigns/{campaign_id}/leads/{email}",
-            payload=lead
+            payload=lead,
         )
 
         return response
-
 
     def delete_lead(self, campaign_id: str, email: str):
         """
@@ -192,16 +201,23 @@ class Campaigns:
         return self.client.send_request(
             method="DELETE",
             endpoint=f"/campaigns/{campaign_id}/leads/{email}",
-            params={"action": "remove"}
+            params={"action": "remove"},
         )
 
     def delete_campaign(self, campaign_id):
         return self.client.send_request("DELETE", f"/campaigns/{campaign_id}")
 
-    def add_a_lead(self, campaign_id, lead: dict, deduplicate=True, find_email=False, linkedin_enrichment=False,
-                   verify_email=False):
+    def add_a_lead(
+        self,
+        campaign_id,
+        lead: dict,
+        deduplicate=True,
+        find_email=False,
+        linkedin_enrichment=False,
+        verify_email=False,
+    ):
 
-        email = lead.get('email')
+        email = lead.get("email")
         if not email:
             raise ValueError("Email is required for a lead")
 
@@ -209,14 +225,115 @@ class Campaigns:
             "deduplicate": deduplicate,
             "findEmail": find_email,
             "linkedinEnrichment": linkedin_enrichment,
-            "verifyEmail": verify_email
+            "verifyEmail": verify_email,
         }
 
         return self.client.send_request(
             method="POST",
             endpoint=f"/campaigns/{campaign_id}/leads",
             params=params,
-            payload=lead
+            payload=lead,
+        )
+
+    def add_lead_variables(self, lead_id, variables: dict):
+        """
+        This endpoint allows you to add one or more variables to the lead matching the leadId specified in the URL parameters.
+
+        If a campaign is fully synced with a CRM via lemlist, any variables in the CRM will override the data in lemlist.
+
+        If the lead doesn't exist a 404 error will be returned.
+        HTTP Request
+
+        POST https://api.lemlist.com/api/leads/:leadId/variables?key=value
+        URL Parameters
+        Parameter 	Description
+        leadId 	The ID of the lead.
+        Body Parameters
+
+        Body is mandatory. It must be a query string with the variables to update
+
+        If no body is specified a 400 error will be returned.
+
+        curl -X POST https://api.lemlist.com/api/leads/lea_xxxx/variables?company=Ikea&occupation=developer \
+          --user ":YourApiKey"
+
+        The above command returns JSON structured like this:
+
+        {
+        "ok": true
+        }
+        """
+        if len(variables) == 0:
+            raise ValueError("List of variables must be not be empty")
+
+        return self.client.send_request(
+            method="POST",
+            endpoint=f"/leads/{lead_id}/variables",
+            params=variables,
+        )
+
+    def update_lead_variables(self, lead_id, variables: dict):
+        """
+        This endpoint allows you to update one or more variables to the lead matching the leadId specified in the URL parameters.
+
+        If a campaign is fully synced with a CRM via lemlist, any variables in the CRM will override the data in lemlist.
+
+        If the lead doesn't exist a 404 error will be returned.
+        HTTP Request
+
+        PATCH https://api.lemlist.com/api/leads/:leadId/variables?key=value
+        URL Parameters
+        Parameter 	Description
+        leadId 	The ID of the lead.
+        Body Parameters
+
+        Body is mandatory. It must be a query string with the variables to update
+
+        If no body is specified a 400 error will be returned.
+
+        curl -X PATCH https://api.lemlist.com/api/leads/lea_xxxx/variables?company=Ikea&occupation=developer \
+          --user ":YourApiKey"
+
+        The above command returns JSON structured like this:
+
+        {
+        "ok": true
+        }
+        """
+        if len(variables) == 0:
+            raise ValueError("List of variables must be not be empty")
+
+        return self.client.send_request(
+            method="PATCH",
+            endpoint=f"/leads/{lead_id}/variables",
+            params=variables,
+        )
+
+    def delete_lead_variables(self, lead_id: str, variables: dict):
+        """
+        This endpoint delete one or many lead variables.
+        HTTP Request
+
+        DELETE https://api.lemlist.com/api/leads/:leadId/variables?key=value
+        URL Parameters
+        Parameter 	Description
+        leadId 	The ID of the lead.
+        Query Parameters: the list of variables to delete
+
+
+        > curl -X DELETE https://api.lemlist.com/api/leads/lea_xxx/variables?key=value --user ":YourApiKey"
+        > {
+              "ok": "true"
+            }
+        """
+
+        if len(variables) == 0:
+            raise ValueError("List of variables must be not be empty")
+
+        return self.client.send_request(
+            method="DELETE",
+            endpoint=f"/leads/{lead_id}/variables",
+            params=variables,
         )
 
 
@@ -253,4 +370,3 @@ class Campaigns:
 #     # response = lemlist_campaigns.add_a_lead(campaign_id=campaign["_id"], lead=lead.dict())
 #
 #     print(response)
-
